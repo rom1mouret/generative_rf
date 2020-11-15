@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 def class_sampling(
         X: np.ndarray,
         proba: np.ndarray,
-        sample_weights: np.ndarray,
+        sample_weights: np.ndarray=None,
         max_duplication: int=2) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """ Duplicate each feature vector for each class, while adjusting
     sample_weights to reflect the given probabilities.
@@ -35,6 +35,9 @@ def class_sampling(
     sample_weight : numpy.ndarray
         Sample weights for training a new random forest. Shape: (n_samples, )
     """
+    if sample_weights is None:
+        sample_weights = np.ones(X.shape[0])
+
     dup = min(proba.shape[1], max_duplication + 1)
     argtop = (-proba).argsort(axis=1)[:, :dup]
     row_indices = np.arange(len(proba))[:, np.newaxis]
@@ -81,7 +84,7 @@ class FeatureGenerator:
         # we need means and stds to initialize the generated data
         self._scaler = StandardScaler()
 
-    def generate(self, approx_n: int) -> Tuple[np.ndarray, np.ndarray]:
+    def generate(self, approx_n: int) -> np.ndarray:
         """ Generate data near the decision boundaries.
         Parameters
         ----------
@@ -99,17 +102,13 @@ class FeatureGenerator:
         n_per_tree = approx_n // self._rf.n_estimators
         n = self._rf.n_estimators * n_per_tree  # actual number of samples
 
-        # default values (some features won't be set)
+        # default values (some features won't be set by the below algorithm)
         stds = np.sqrt(self._scaler.var_)
         X = np.random.normal(size=(n, self._dim)) * stds + self._scaler.mean_
-
-        # this arrays counts the number of draws that fall into a different leaf
-        weights = np.zeros(n)
 
         # generate n_per_tree samples from each tree
         for i_tree, estimator in enumerate(self._rf.estimators_):
             tree = estimator.tree_
-            leaf_to_row_index = defaultdict(list)  # to calculate weights
             for i in range(n_per_tree):
                 row_index = i_tree * n_per_tree + i
                 node_index = 0
@@ -119,7 +118,6 @@ class FeatureGenerator:
                 # randomly pick one path in the tree
                 while node_index != TREE_LEAF and \
                     tree.children_left[node_index] != tree.children_right[node_index]:
-                    prev_node_index = node_index
                     threshold = tree.threshold[node_index]
                     feature_i = tree.feature[node_index]
 
@@ -134,6 +132,9 @@ class FeatureGenerator:
                         value = threshold + shift
                     # ... but still within the known bounds
                     value = min(right_bound[feature_i], max(left_bound[feature_i], value))
+                    # alternatively, we could keep the value already set, but I believe
+                    # the chosen method restricts the value to be even closer to the
+                    # decision boundary
                     X[row_index, feature_i] = value
 
                     # branching
@@ -144,16 +145,7 @@ class FeatureGenerator:
                         node_index = tree.children_right[node_index]
                         left_bound[feature_i] = max(left_bound[feature_i], threshold)
 
-                # see below how this is used to calculate weights:
-                leaf_to_row_index[prev_node_index].append(row_index)
-
-            for indices in leaf_to_row_index.values():
-                # if two draws fall into the same leaf, their weight is 1/2
-                w = 1 / len(indices)
-                for k in indices:
-                    weights[k] = w
-
-        return X, weights
+        return X
 
     def register(
             self, X: np.ndarray,

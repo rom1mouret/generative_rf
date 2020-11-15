@@ -85,17 +85,15 @@ for i, df in enumerate(read_chunks()):
         gen_rf.register(X, new_rf)
     else:
         # generate data from the forest
-        X2, sample_weights = gen_rf.generate(len(df) * 10)
+        X2 = gen_rf.generate(len(df) * 10)
         y2 = gen_rf.predict(X2)
-        sample_weights *= X.shape[0] / sample_weights.sum()
 
         # merge with current data
         X_all = np.concatenate([X, X2], axis=0)
         y_all = np.concatenate([y, y2], axis=0)
-        weights_all = 2 * np.concatenate([[1]*len(y), sample_weights], axis=0)
 
         # train a new forest from all the data
-        new_rf = RandomForestRegressor().fit(X_all, y_all, sample_weight=weights_all)
+        new_rf = RandomForestRegressor().fit(X_all, y_all)
         gen_rf.register(X, new_rf)
     #elif no prediction error:
     #   gen_ref.reinforce(X)  # without re-training

@@ -4,7 +4,6 @@ GenerativeRF is a library that can transform your ordinary random forest into a 
 
 - [Python, on top of scikit-learn](./python)
 - GOLANG: soon
-- Java or Scala: soon (perhaps)
 
 ## Motivation
 
@@ -39,8 +38,10 @@ This graph shows a few baselines:
 - RollingRF(0.8) replaces 20% the oldest trees with new trees trained from new data.
 - SlowForgettingRF(0.8) randomly replaces 20% of the trees with new trees trained from new data.
 
-Both RollingRF and SlowForgettingRF underperform.
-SlowForgettingRF is capable of learning new things from new data, and doesn't quickly forget what it has previously learned, but the eldest trees drag the accuracy down when presented with data too recent for them.
+(in more familiar terms, RollingRF and SlowForgettingRF are possible implementations of scikit's `partial_fit` interface)
+
+Both RollingRF and SlowForgettingRF underperform in my benchmarks.
+SlowForgettingRF is capable of learning new things from new data, and doesn't quickly forget what it has previously learned, but the eldest trees drag the accuracy down when presented with data too recent for them. Put differently, such trees are unable to detect if the input is out-of-distribution, and therefore cannot avoid pushing predictions towards the wrong direction.
 
 Now, let's compare these baselines with GenerativeRF.
 
@@ -48,7 +49,7 @@ Now, let's compare these baselines with GenerativeRF.
   <img src="images/cmp2.png" />
 </p>
 
-Another view at the problem, comparing with the ground truth temperatures.
+Another view at the problem, comparing with the ground-truth temperatures.
 
 
 <p align="center">
@@ -69,7 +70,7 @@ This turns out to be effective for training new, accurate random forests though,
 
 As targets/labels are not involved in the generation process, GenerativeRF readily works for both regression and classification.
 The algorithm would be more accurate if it were taking into account the distribution of the target in each leaf.
-In practice, however, since by design the variance/entropy of the target is near zero at the leaf level, it is not worth customizing the algorithm for either classification or regression.
+In practice, however, since by design the variance/entropy of the target is near zero at the leaf level, leaves provide little information and it is not worth customizing the algorithm for either classification or regression.
 
 The method used by GenerativeRF has a lot in common with [uncertainty sampling](https://en.wikipedia.org/wiki/Active_learning_(machine_learning)), so I would not be surprised if it were to perform well in an [active learning](https://en.wikipedia.org/wiki/Active_learning_(machine_learning)) setting.
 Another area where it could be useful is [knowledge distillation](https://en.wikipedia.org/wiki/Knowledge_distillation), but I wouldn't put my money on it.

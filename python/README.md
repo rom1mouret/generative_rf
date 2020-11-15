@@ -43,18 +43,20 @@ while True:
   else:
     # generate new data
     # please tailor approx_n for the problem at hand
-    X2, sample_weights = gen_rf.generate(approx_n=20000)
+    X2 = gen_rf.generate(approx_n=20000)
     y2 = gen_rf.predict(X2)
-    sample_weights *= X.shape[0] / sample_weights.sum()
 
     # merge with current data
     X_all = np.concatenate([X, X2], axis=0)
     y_all = np.concatenate([y, y2], axis=0)
-    weights_all = 2 * np.concatenate([[1]*len(y), sample_weights], axis=0)
 
     # train a new forest from all the data
-    new_rf = RandomForestRegressor().fit(X_all, y_all, sample_weight=weights_all)
+    new_rf = RandomForestRegressor().fit(X_all, y_all)
     gen_rf.register(X, new_rf)
+
+    # possible ways of using new_rf:
+    # 1. compare predictions with the ground truth to detect anomalies
+    # 2. serialize new_rf and use it wherever there is no ground truth available
 ```
 
 ## Continual learning classification on a data stream
@@ -78,10 +80,9 @@ while True:
   else:
     # generate new data
     # please tailor approx_n for the problem at hand
-    X2, sample_weights = gen_rf.generate(approx_n=20000)
+    X2 = gen_rf.generate(approx_n=20000)
     proba = gen_rf.predict_proba(X2)
-    X2, y2, sample_weights = class_sampling(X2, proba, sample_weights)
-    sample_weights *= X.shape[0] / sample_weights.sum()
+    X2, y2, sample_weights = class_sampling(X2, proba)
 
     # merge with current data
     X_all = np.concatenate([X, X2], axis=0)
@@ -91,4 +92,8 @@ while True:
     # train a new forest from all the data
     new_rf = RandomForestClassifier().fit(X_all, y_all, sample_weight=weights_all)
     gen_rf.register(X, new_rf)
+
+    # possible ways of using new_rf:
+    # 1. compare predictions with the ground truth to detect anomalies
+    # 2. serialize new_rf and use it wherever there is no ground truth available
 ```
