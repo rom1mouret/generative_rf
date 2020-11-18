@@ -3,7 +3,7 @@ GenerativeRF is a library that can transform your ordinary random forest into a 
 ## Implementations
 
 - [Python, on top of scikit-learn](./python)
-- [GOLANG, on top of GoLearn](./golearn)
+- [GO, on top of GoLearn](./golearn)
 
 ## Motivation
 
