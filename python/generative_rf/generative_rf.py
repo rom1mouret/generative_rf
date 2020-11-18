@@ -60,18 +60,18 @@ class CountingTree:
         There is no reason for the user to directly use this class. """
     def __init__(self, base_tree: Union[DecisionTreeRegressor, DecisionTreeClassifier]) -> None:
         self._tree = base_tree
-        self._count = np.zeros(self._tree.tree_.node_count, dtype=np.int32)
+        self._count = np.zeros(self._tree.tree_.node_count)
 
-    def count(self, X: np.ndarray) -> None:
+    def count(self, X: np.ndarray, weight: float) -> None:
         # indicator is a sparse matrix of shape (n_samples, n_nodes)
         indicator = self._tree.decision_path(X)
 
         # iterate over the indicator matrix to count the samples in each branch
         rows, cols = indicator.nonzero()
-        np.add.at(self._count, cols, 1)
+        np.add.at(self._count, cols, weight)
         # equivalent to:
         # for j in cols:
-        #     self._count[j] += 1
+        #     self._count[j] += weight
 
     def left_probability(self, node_index: int) -> float:
         left = self._count[self._tree.tree_.children_left[node_index]]
@@ -83,8 +83,9 @@ class FeatureGenerator:
     def __init__(self) -> None:
         # we need means and stds to initialize the generated data
         self._scaler = StandardScaler()
+        self._total_samples = 0
 
-    def generate(self, approx_n: int) -> np.ndarray:
+    def generate(self, approx_n: int) -> Tuple[np.ndarray, float]:
         """ Generate data near the decision boundaries.
         Parameters
         ----------
@@ -95,8 +96,8 @@ class FeatureGenerator:
         -------
         data : numpy.ndarray
             Generated features. Shape: (n_samples, dim)
-        sample_weight : numpy.ndarray
-            Sample weights for training a new random forest. Shape: (n_samples, )
+        sample_weight : float
+            Weight of each sample
         """
         # number of samples per tree
         n_per_tree = approx_n // self._rf.n_estimators
@@ -145,42 +146,53 @@ class FeatureGenerator:
                         node_index = tree.children_right[node_index]
                         left_bound[feature_i] = max(left_bound[feature_i], threshold)
 
-        return X
+        return X, self._total_samples / X.shape[0]
 
-    def register(
-            self, X: np.ndarray,
-            rf: Union[RandomForestRegressor, RandomForestClassifier]) -> None:
+    def register(self, rf: Union[RandomForestRegressor, RandomForestClassifier]) -> "FeatureGenerator":
         """ Call this function after training your random forest, whether or not
         the forest was trained from generated data.
 
         Parameters
         ----------
-        X : numpy.ndarray
-            The features the random forest was trained from. Shape: (nrows, dim)
-            This includes generated data, if the forest was trained from such
-            data.
         rf : RandomForestRegressor or RandomForestClassifier
-             A trained random forest.
+             A newly trained random forest.
         """
-        self._dim = X.shape[1]
         self._rf = rf
+        self._dim = rf.n_features_
         self._counting_trees = [CountingTree(t) for t in rf.estimators_]
-        self.reinforce(X)
 
-    def reinforce(self, X: np.ndarray) -> None:
-        """ Call this function if you are not using X for training (perhaps
-        because the current RF works well enough on X), but you still
-        want to nudge the generator towards X.
+        return self
+
+    def update_moments(self, X: np.ndarray) -> "FeatureGenerator":
+        """ Updates mean and variance of the data distribution
 
         Parameters
         ----------
         X : numpy.ndarray
             Features the random forest is run on. Shape: (nrows, dim)
-            Typically prediction data.
+            Typically, X is an input prediction batch.
         """
         self._scaler.partial_fit(X)
+        self._total_samples += X.shape[0]
+
+        return self
+
+    def reinforce(self, X: np.ndarray, weight: float=1) -> "FeatureGenerator":
+        """ updates the sample counts at the tree node level.
+        Always call this method after training
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Features the random forest is run on. Shape: (nrows, dim)
+            Typically the training data.
+        weight: float
+            X's sample weights
+        """
         for wrapper in self._counting_trees:
-            wrapper.count(X)
+            wrapper.count(X, weight)
+
+        return self
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """ This is just for convenience.

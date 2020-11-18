@@ -3,7 +3,7 @@ GenerativeRF is a library that can transform your ordinary random forest into a 
 ## Implementations
 
 - [Python, on top of scikit-learn](./python)
-- GOLANG: soon
+- [GOLANG, on top of GoLearn](./golearn)
 
 ## Motivation
 
@@ -76,7 +76,126 @@ The method used by GenerativeRF has a lot in common with [uncertainty sampling](
 Another area where it could be useful is [knowledge distillation](https://en.wikipedia.org/wiki/Knowledge_distillation), but I wouldn't put my money on it.
 
 
-### Toy dataset
+### Pseudo-code
+
+```JavaScript
+function OnlineLearning(streamer, generator) {
+  forest = BootstrapRandomForest()
+  for batch, y in streamer.Poll() {
+    if DataDrifted(batch, y) {
+      // re-training
+      gx, gy, gw = Generate(generator, forest, numSamples=20000)
+      batch = Concat(batch, gx)
+      targets = Concat(y, gy)
+      weights = Concat(ones(size(y)), gw * ones(20000))
+      forest = TrainRandomForest(batch, targets, weights)
+      Reinforce(generator, gx, forest, weight=gw)
+    }
+    Reinforce(generator, batch, forest, weight=1)
+    UpdateMoments(generator, batch)
+  }
+}
+```
+
+```JavaScript
+function Reinforce(generator, data, forest, weight) {
+  // this is to calculate the transition probabilities required to
+  // guide the random walks on the trees
+  for row in Rows(data) {
+    for tree in forest {
+      for node in forest.DecisionPath(row) {
+        generator.count[node] += weight
+      }
+    }
+  }
+}
+```
+
+```JavaScript
+function UpdateMoments(generator, data, forest) {
+  // this is for generating the default feature values:
+  generator.variance.Update(data)
+  generator.mean.Update(data)
+
+  // this is to calculate the sample weights of the generated rows:
+  generator.total += NumRows(data)
+}
+```
+
+
+```JavaScript
+function Reinforce(generator, data, forest) {
+  // this is for generating the default feature values:
+  generator.variance.Update(data)
+  generator.mean.Update(data)
+
+  // this is to calculate the sample weights of the generated rows:
+  generator.total += NumRows(data)
+
+  // this is to calculate the transition probabilities required to
+  // guide the random walks on the trees
+  for row in Rows(data) {
+    for tree in forest {
+      for node in forest.DecisionPath(row) {
+        generator.count[node] += 1
+      }
+    }
+  }
+}
+```
+
+
+```JavaScript
+function Generate(generator, forest, numSamples) {
+  // initialize the generated features with default values
+  features = Normal(generator.mean, generator.variance, size=numSamples)
+  // reminder: trees don't utilize all the features,
+  // hence the need for default values
+
+  // sample weights
+  weight = generator.total / numSamples
+
+  // number of samples we will generate out of each tree
+  samplesPerTree = numSamples / size(forest)
+
+  // random walk
+  i = 0
+  for tree in forest {
+    repeat samplesPerTree times {
+      for (featureName, value) in RandomWalk(generator, tree.root) {
+        features[featureName, i] = val
+      }
+      i = 1
+    }
+  }
+
+  y = forest.predict(features)
+
+  return features, y, weight
+}
+```
+
+```JavaScript
+function RandomWalk(generator, node) {
+  values = Map()
+  while NotLeaf(node) {
+    nudge = 0.001 * Normal(generator.variance[node.featureName])
+    if Rand() < generator.LeftProbability(node) {
+      value = node.threshold - nudge
+      node = node.left
+    } else {
+      value = node.threshold + nudge
+      node = node.right
+    }
+    values[node.featureName] = value
+  }
+  return values
+}
+```
+
+
+
+# Toy dataset
 
 s_curve data learned by a random forest:
 <p align="center">

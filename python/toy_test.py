@@ -22,10 +22,8 @@ plt.yticks([], [])
 plt.title("Prediction with RandomForestRegressor")
 plt.show()
 
-generator = FeatureGenerator()
-generator.register(X, rf)
-
-data = generator.generate(50000)
+generator = FeatureGenerator().register(rf).reinforce(X).update_moments(X)
+data, _ = generator.generate(50000)
 y = rf.predict(data)
 
 plt.clf()

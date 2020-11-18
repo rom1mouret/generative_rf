@@ -47,19 +47,24 @@ for i, df in enumerate(read_chunks()):
 
     # training
     if i == 0:
-        gen_rf.register(X, RandomForestRegressor().fit(X, y))
+        gen_rf.register(RandomForestRegressor().fit(X, y))
     else:
         # generate data from the forest
-        X2 = gen_rf.generate(len(df) * 10)
+        X2, w2 = gen_rf.generate(10000)
         y2 = gen_rf.predict(X2)
 
         # merge with current data
         X_all = np.concatenate([X, X2], axis=0)
         y_all = np.concatenate([y, y2], axis=0)
+        w = np.array([1] * X.shape[0] + [w2] * X2.shape[0])
+        w *= len(w) / w.sum()
 
         # train a new forest from all the data
-        new_rf = RandomForestRegressor().fit(X_all, y_all)
-        gen_rf.register(X, new_rf)
+        new_rf = RandomForestRegressor().fit(X_all, y_all, sample_weight=w)
+        gen_rf.register(new_rf).reinforce(X2, w2)
+
+    # always call these functions at the end of each iteration
+    gen_rf.reinforce(X).update_moments(X)
 
 # visualization
 def rolling_avg(arr):
