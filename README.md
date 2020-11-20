@@ -122,29 +122,6 @@ function UpdateMoments(generator, data, forest) {
 }
 ```
 
-
-```JavaScript
-function Reinforce(generator, data, forest) {
-  // this is for generating the default feature values:
-  generator.variance.Update(data)
-  generator.mean.Update(data)
-
-  // this is to calculate the sample weights of the generated rows:
-  generator.total += NumRows(data)
-
-  // this is to calculate the transition probabilities required to
-  // guide the random walks on the trees
-  for row in Rows(data) {
-    for tree in forest {
-      for node in forest.DecisionPath(row) {
-        generator.count[node] += 1
-      }
-    }
-  }
-}
-```
-
-
 ```JavaScript
 function Generate(generator, forest, numSamples) {
   // initialize the generated features with default values
