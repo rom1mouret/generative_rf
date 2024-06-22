@@ -35,7 +35,7 @@ Those benchmarks evaluate GenerativeRF's success in predicting the temperatures 
 
 This graph shows a few baselines:
 - Oracle RF has access to the entire dataset. i.e. it is *not* an online learning algorithm.
-- RollingRF(0.8) replaces 20% the oldest trees with new trees trained from new data.
+- RollingRF(0.8) replaces 20% of the oldest trees with new trees trained from new data.
 - SlowForgettingRF(0.8) randomly replaces 20% of the trees with new trees trained from new data.
 
 (in more familiar terms, RollingRF and SlowForgettingRF are possible implementations of scikit's `partial_fit` interface)
@@ -49,13 +49,11 @@ Now, let's compare these baselines with GenerativeRF.
   <img src="images/cmp2.png" />
 </p>
 
-Another view at the problem, comparing with the ground-truth temperatures.
-
+Another view of the problem, comparing with the ground-truth temperatures.
 
 <p align="center">
   <img src="images/vs_ground_truth_80.png" />
 </p>
-
 
 # Under the hood
 
